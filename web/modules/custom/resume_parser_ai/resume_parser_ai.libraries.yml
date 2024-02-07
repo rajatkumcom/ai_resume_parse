@@ -1,0 +1,8 @@
+resume_parser_ai.custom:
+  css:
+    theme:
+      css/resume_parser_ai.css: {}
+  js:
+    js/resume_parser_ai.js: {}
+  dependencies:
+    - core/jquery

@@ -1,53 +1,172 @@
 <?php
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\file\Entity\File;
-use Drupal\Core\Url;
+use Drupal\Core\Ajax\AjaxResponse;
+use Drupal\Core\Ajax\ReplaceCommand;
+use Drupal\taxonomy\Entity\Term;
+
 /**
  * Implements hook_form_alter().
  */
 function resume_parser_ai_form_alter(&$form, FormStateInterface $form_state, $form_id) {
 
+  if ($form_id == 'node_resume_form') {
+    $form['field_first_name']['#access'] = FALSE;
+    $form['field_last_name']['#access'] = FALSE;
+    $form['field_experience']['#access'] = FALSE;
+    $form['field_phone']['#access'] = FALSE;
+    $form['field_email']['#access'] = FALSE;
+    $form['field_skills']['#access'] = FALSE;
+    $form['field_education']['#access'] = FALSE;
+    $form['field_current_ctc']['#prefix'] = '<div id="resume-ajax-content"></div>';
+  }
+  if ($form_id == 'node_resume_edit_form') {
+    $form['field_first_name']['#prefix'] = '<div id="resume-ajax-content">'; 
+    $form['field_skills']['#suffix'] = '</div>'; 
+  }
   if ($form_id == 'node_resume_edit_form' || $form_id == 'node_resume_form') {
-    $form['actions']['submit']['#submit'][] = 'custom_resume_parser_ai_submission';
+    
+    $form['#attached']['library'][] = 'resume_parser_ai/resume_parser_ai.custom';
+    $form['title']['#access'] = FALSE;
+    
+    if(count($form_state->getValues()) > 0) {
+      $form['field_first_name']['#access'] = TRUE;
+      $form['field_last_name']['#access'] = TRUE;
+      $form['field_experience']['#access'] = TRUE;
+      $form['field_phone']['#access'] = TRUE;
+      $form['field_email']['#access'] = TRUE;
+      $form['field_skills']['#access'] = TRUE;
+      $form['field_education']['#access'] = TRUE;
+
+      if(isset($form_state->getUserInput()['field_skills'])) {
+        $form['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
+        $form_state->getCompleteForm()['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
+      }
+    }
+
+    if (\Drupal::request()->query->get('ajax_form') == 1 && \Drupal::request()->query->get('element_parents') != 'field_resume/widget/0') {
+      _set_resume_form_value_ajax($form, $form_state);
+    }
+
+    $form['ajax_submit'] = [
+      '#name' => 'ajax_submit',
+      '#type' => 'button', 
+      '#value' => t('Ajax Submit'),
+      '#ajax' => [
+        'event' => 'click',
+        'callback' => '_custom_resume_parser_ai_ajax',
+        'wrapper' => 'resume-ajax-content',
+        'method' => 'replace',
+      ],
+      '#attributes' => [
+        'class' => ['display-none-ajax-button']
+      ],
+    ];
+
+    array_unshift($form['actions']['submit']['#submit'], '_custom_resume_parser_ai_submission');
   }
 }
 
-function custom_resume_parser_ai_submission(&$form, FormStateInterface &$form_state) {
-    
-    $file = $form_state->getValue('field_resume');
+function _custom_resume_parser_ai_ajax(&$form, FormStateInterface &$form_state) {
 
-    if(isset($file)) {
-      // $file = File::load($file[0]['fids'][0]);
-      // $uri = $file->getFileUri();
-      // $url = Url::fromUri(file_create_url($uri))->toString();
+  $ajax_return_form = [];
 
-      $file = File::load($file[0]['fids'][0]);  
-      $uri = $file->getFileUri();
-      $url = \Drupal::service('file_url_generator')->generate($uri);
-      // Your url as a string
-      $string = $url ->toString();
+  $ajax_return_form['field_first_name'] = $form['field_first_name'];
+  $ajax_return_form['field_last_name'] = $form['field_last_name'];
+  $ajax_return_form['field_experience'] = $form['field_experience'];
+  $ajax_return_form['field_phone'] = $form['field_phone'];
+  $ajax_return_form['field_email'] = $form['field_email'];
+  $ajax_return_form['field_skills'] = $form['field_skills'];
+  $ajax_return_form['field_education'] = $form['field_education'];
+  $ajax_return_form['field_first_name']['#prefix'] = '<div id="resume-ajax-content">'; 
+  $ajax_return_form['field_skills']['#suffix'] = '</div>'; 
 
-      // dump($string);
-      // die;
+  $response = new AjaxResponse();
+	$response->addCommand(new ReplaceCommand('#resume-ajax-content', $ajax_return_form));
 
-      // $command = escapeshellcmd('pdf_parser.py');
-      // $output = shell_exec($command);
-      // var_dump($output);
-// die;
-// echo exec('whoami') . '<br>';
-// echo exec('groups') . '<br>';
-      $temp = tempnam(sys_get_temp_dir(), 'TMP_');
-      file_put_contents($temp . '.py', file_get_contents(dirname(__FILE__) . "/pdf_parser.py"));
+  return $response;
+}
 
-      // dump( file_get_contents($temp . '.py'));
+function _set_resume_form_value_ajax(&$form, &$form_state) {
+  $file = $form_state->getValue('field_resume');
 
-      // sudo -u root -S python3 pdf_parser.py < passwordfile.txt
-      exec('python3 pdf_parser.py', $str, $retval);
+  if(isset($file)) {
 
-      // var_dump($str);
-      // var_dump($retval);
-      // die;
+    $file = File::load($file[0]['fids'][0]);  
+    $uri = $file->getFileUri();
+    $url = \Drupal::service('file_url_generator')->generate($uri);
+
+    $string = $url ->toString();
+
+    $string = str_replace('%20', ' ', $string);
+
+    $temp = tempnam(sys_get_temp_dir(), 'TMP_');
+    file_put_contents($temp . '.py', file_get_contents(dirname(__FILE__) . "/py_files/pdf_parser.py"));
+
+    $ext = trim(explode('.', $string)[1]);
+
+    exec('python3 ' . $temp . ".py '" . $_SERVER["DOCUMENT_ROOT"] . $string . "' " . $ext, $resume_data, $retval);
+
+    $education = str_replace("{'", '', $resume_data[5]);
+    $education = str_replace("'}", '', $education);
+    $education = str_replace("'", '', $education);
+
+    $skills = str_replace("{'", '', $resume_data[4]);
+    $skills = str_replace("'}", '', $skills);
+    $skills = str_replace("'", '', $skills);
+
+    $arr_skills = explode(',', $skills);
+
+    $form['field_first_name']['widget'][0]['value']['#value'] = $resume_data[0];
+    $form['field_last_name']['widget'][0]['value']['#value'] = $resume_data[1];
+    $form['field_phone']['widget'][0]['value']['#value'] = $resume_data[2];
+    $form['field_email']['widget'][0]['value']['#value'] = $resume_data[3];
+    $form['field_education']['widget'][0]['value']['#value'] = $education;
+    $form['field_experience']['widget'][0]['value']['#value'] = $resume_data[6];
+
+    $arr_term_ids = [];
+    foreach($arr_skills as $key => $str_skill) {
+      $terms = \Drupal::entityTypeManager()
+            ->getStorage('taxonomy_term')
+            ->loadByProperties([
+                    'vid' => 'skills',
+                    'name' => trim($str_skill),
+                ]);
+      if(is_array($terms) && count($terms) > 0) {
+        foreach($terms as $term) {
+          $arr_term_ids[$term->id()] = $term->getName();
+        }
+      } else {
+        $term_id = Term::create([
+          'name' => trim($str_skill), 
+          'vid' => 'skills',
+        ])->save();
+        $arr_term_ids[$term_id] = trim($str_skill);
+      }
     }
 
+    $i = 0;
+    $arr_value = [];
+    foreach($arr_term_ids as $term_id => $term_name) {
+      $form['field_skills']['widget'][$i] = $form['field_skills']['widget'][0];
+      $form['field_skills']['widget'][$i]['target_id']['#value'] = $term_name . ' (' . $term_id . ')';
+      $arr_value[] = ['value' => $term_name . ' (' . $term_id . ')'];
+      
+      $i++;
+    }
+    $form_state->setValue('field_skills', $arr_value);
+  }
+}
+
+function _custom_resume_parser_ai_submission(&$form, FormStateInterface &$form_state) {
+  if(isset($form_state->getUserInput()['field_skills'])) {
+    $form['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
+    $form_state->getCompleteForm()['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
+  }
+dump($form);
+dump($form_state);
+// dump($form_state->getUserInput());
+die;
+  $form_state->setValue('title', [['value' => $form_state->getValue('field_first_name')[0]['value'] . ' ' . $form_state->getValue('field_last_name')[0]['value']]]);
    
 }
