@@ -1,0 +1,24 @@
+slack.settings:
+  type: config_object
+  mapping:
+    slack_webhook_url:
+      type: uri
+      label: 'The Webhook URL from an "Incoming WebHooks" integration.'
+    slack_channel:
+      type: string
+      label: 'The channel name with # symbol, for example #general (or @username for a private message or a private group name).'
+    slack_username:
+      type: string
+      label: 'The name of the Slack bot'
+    slack_icon_type:
+      type: string
+      label: 'Type of image'
+    slack_icon_emoji:
+      type: string
+      label: 'The emoji for the Slack bot'
+    slack_icon_url:
+      type: uri
+      label: 'The icon for the Slack bot'
+    slack_link_names:
+      type: boolean
+      label: 'Link names in the message options'

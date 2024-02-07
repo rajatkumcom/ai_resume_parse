@@ -1,0 +1,53 @@
+<?php
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\file\Entity\File;
+use Drupal\Core\Url;
+/**
+ * Implements hook_form_alter().
+ */
+function resume_parser_ai_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+
+  if ($form_id == 'node_resume_edit_form' || $form_id == 'node_resume_form') {
+    $form['actions']['submit']['#submit'][] = 'custom_resume_parser_ai_submission';
+  }
+}
+
+function custom_resume_parser_ai_submission(&$form, FormStateInterface &$form_state) {
+    
+    $file = $form_state->getValue('field_resume');
+
+    if(isset($file)) {
+      // $file = File::load($file[0]['fids'][0]);
+      // $uri = $file->getFileUri();
+      // $url = Url::fromUri(file_create_url($uri))->toString();
+
+      $file = File::load($file[0]['fids'][0]);  
+      $uri = $file->getFileUri();
+      $url = \Drupal::service('file_url_generator')->generate($uri);
+      // Your url as a string
+      $string = $url ->toString();
+
+      // dump($string);
+      // die;
+
+      // $command = escapeshellcmd('pdf_parser.py');
+      // $output = shell_exec($command);
+      // var_dump($output);
+// die;
+// echo exec('whoami') . '<br>';
+// echo exec('groups') . '<br>';
+      $temp = tempnam(sys_get_temp_dir(), 'TMP_');
+      file_put_contents($temp . '.py', file_get_contents(dirname(__FILE__) . "/pdf_parser.py"));
+
+      // dump( file_get_contents($temp . '.py'));
+
+      // sudo -u root -S python3 pdf_parser.py < passwordfile.txt
+      exec('python3 pdf_parser.py', $str, $retval);
+
+      // var_dump($str);
+      // var_dump($retval);
+      // die;
+    }
+
+   
+}

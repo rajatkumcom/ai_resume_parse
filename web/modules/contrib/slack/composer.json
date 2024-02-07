@@ -1,0 +1,36 @@
+{
+    "name": "drupal/slack",
+    "description": "Integration with Slack.com service.",
+    "type": "drupal-module",
+    "homepage": "https://www.drupal.org/project/slack",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Serge_Konst",
+            "homepage": "https://www.drupal.org/u/serge_konst",
+            "role": "Maintainer"
+        },
+        {
+            "name": "Evgeny Leonov",
+            "homepage": "https://www.drupal.org/u/hxdef",
+            "role": "Maintainer"
+        },
+        {
+            "name": "adci_contributor",
+            "homepage": "https://www.drupal.org/u/adci_contributor",
+            "role": "Maintainer"
+        },
+        {
+            "name": "Stephen Mustgrave (smustgrave)",
+            "homepage": "https://www.drupal.org/u/smustgrave",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://www.drupal.org/project/issues/slack",
+        "source": "https://git.drupalcode.org/project/slack"
+    },
+    "require": {
+        "drupal/core": "^9 || ^10"
+    }
+}

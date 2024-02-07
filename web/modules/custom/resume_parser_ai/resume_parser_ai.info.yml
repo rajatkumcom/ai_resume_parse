@@ -1,0 +1,5 @@
+name: AXL Resume Parser AI
+description: AXL Resume Parser AI.
+package: Custom
+type: module
+core_version_requirement: ^9.2 || ^10
