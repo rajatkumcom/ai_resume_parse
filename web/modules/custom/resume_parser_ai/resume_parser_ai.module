@@ -28,6 +28,9 @@ function resume_parser_ai_form_alter(&$form, FormStateInterface $form_state, $fo
     
     $form['#attached']['library'][] = 'resume_parser_ai/resume_parser_ai.custom';
     $form['title']['#access'] = FALSE;
+
+    $form['field_resume']['#prefix'] = '<div id="resume-hide-job-role">'; 
+    $form['field_location_field']['#suffix'] = '</div>'; 
     
     if(count($form_state->getValues()) > 0) {
       $form['field_first_name']['#access'] = TRUE;
@@ -37,11 +40,6 @@ function resume_parser_ai_form_alter(&$form, FormStateInterface $form_state, $fo
       $form['field_email']['#access'] = TRUE;
       $form['field_skills']['#access'] = TRUE;
       $form['field_education']['#access'] = TRUE;
-
-      if(isset($form_state->getUserInput()['field_skills'])) {
-        $form['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
-        $form_state->getCompleteForm()['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
-      }
     }
 
     if (\Drupal::request()->query->get('ajax_form') == 1 && \Drupal::request()->query->get('element_parents') != 'field_resume/widget/0') {
@@ -111,62 +109,52 @@ function _set_resume_form_value_ajax(&$form, &$form_state) {
     $education = str_replace("'}", '', $education);
     $education = str_replace("'", '', $education);
 
-    $skills = str_replace("{'", '', $resume_data[4]);
-    $skills = str_replace("'}", '', $skills);
-    $skills = str_replace("'", '', $skills);
-
-    $arr_skills = explode(',', $skills);
-
-    $form['field_first_name']['widget'][0]['value']['#value'] = $resume_data[0];
-    $form['field_last_name']['widget'][0]['value']['#value'] = $resume_data[1];
-    $form['field_phone']['widget'][0]['value']['#value'] = $resume_data[2];
-    $form['field_email']['widget'][0]['value']['#value'] = $resume_data[3];
+    $form['field_first_name']['widget'][0]['value']['#value'] = isset($resume_data[0]) ? $resume_data[0] : '';
+    $form['field_last_name']['widget'][0]['value']['#value'] = isset($resume_data[1]) ? $resume_data[1] : '';
+    $form['field_phone']['widget'][0]['value']['#value'] = isset($resume_data[2]) ? $resume_data[2] : '';
+    $form['field_email']['widget'][0]['value']['#value'] = $resume_data[3] == 'set()' ? '' : $resume_data[3];
     $form['field_education']['widget'][0]['value']['#value'] = $education;
-    $form['field_experience']['widget'][0]['value']['#value'] = $resume_data[6];
+    $form['field_experience']['widget'][0]['value']['#value'] = isset($resume_data[6]) ? $resume_data[6] : '';
 
-    $arr_term_ids = [];
-    foreach($arr_skills as $key => $str_skill) {
-      $terms = \Drupal::entityTypeManager()
-            ->getStorage('taxonomy_term')
-            ->loadByProperties([
-                    'vid' => 'skills',
-                    'name' => trim($str_skill),
-                ]);
-      if(is_array($terms) && count($terms) > 0) {
-        foreach($terms as $term) {
-          $arr_term_ids[$term->id()] = $term->getName();
+    if($resume_data[4] != 'set()') {
+      $skills = str_replace("{'", '', $resume_data[4]);
+      $skills = str_replace("'}", '', $skills);
+      $skills = str_replace("'", '', $skills);
+
+      $arr_skills = explode(',', $skills);
+      $arr_term_ids = [];
+      foreach($arr_skills as $key => $str_skill) {
+        $terms = \Drupal::entityTypeManager()
+              ->getStorage('taxonomy_term')
+              ->loadByProperties([
+                      'vid' => 'skills',
+                      'name' => trim($str_skill),
+                  ]);
+        if(is_array($terms) && count($terms) > 0) {
+          foreach($terms as $term) {
+            $arr_term_ids[$term->id()] = $term->getName();
+          }
+        } else {
+          $term_id = Term::create([
+            'name' => trim($str_skill), 
+            'vid' => 'skills',
+          ])->save();
+          $arr_term_ids[$term_id] = trim($str_skill);
         }
-      } else {
-        $term_id = Term::create([
-          'name' => trim($str_skill), 
-          'vid' => 'skills',
-        ])->save();
-        $arr_term_ids[$term_id] = trim($str_skill);
       }
-    }
 
-    $i = 0;
-    $arr_value = [];
-    foreach($arr_term_ids as $term_id => $term_name) {
-      $form['field_skills']['widget'][$i] = $form['field_skills']['widget'][0];
-      $form['field_skills']['widget'][$i]['target_id']['#value'] = $term_name . ' (' . $term_id . ')';
-      $arr_value[] = ['value' => $term_name . ' (' . $term_id . ')'];
-      
-      $i++;
+      $i = 0;
+      $str_value = '';
+      foreach($arr_term_ids as $term_id => $term_name) {
+        $str_value .= $term_name . ' (' . $term_id . '), ';
+      }
+      $form['field_skills']['widget']['target_id']['#value'] = rtrim($str_value, ", ");
     }
-    $form_state->setValue('field_skills', $arr_value);
   }
 }
 
 function _custom_resume_parser_ai_submission(&$form, FormStateInterface &$form_state) {
-  if(isset($form_state->getUserInput()['field_skills'])) {
-    $form['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
-    $form_state->getCompleteForm()['field_skills']['widget']['#max_delta'] = count($form_state->getUserInput()['field_skills']);
-  }
-dump($form);
-dump($form_state);
-// dump($form_state->getUserInput());
-die;
+  
   $form_state->setValue('title', [['value' => $form_state->getValue('field_first_name')[0]['value'] . ' ' . $form_state->getValue('field_last_name')[0]['value']]]);
    
 }
