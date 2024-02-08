@@ -1,0 +1,7 @@
+name: Resume Update to Slack
+description: Regular resume updates to slack channel based on required skill preference
+type: module
+core_version_requirement: ^10
+configure: resumeslackupdate.settingsform
+dependencies:
+  - "drupal:slack"
