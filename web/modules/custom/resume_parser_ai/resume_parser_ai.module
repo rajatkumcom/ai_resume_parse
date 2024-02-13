@@ -4,6 +4,8 @@ use Drupal\file\Entity\File;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\ReplaceCommand;
 use Drupal\taxonomy\Entity\Term;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 
 /**
  * Implements hook_form_alter().
@@ -18,7 +20,7 @@ function resume_parser_ai_form_alter(&$form, FormStateInterface $form_state, $fo
     $form['field_email']['#access'] = FALSE;
     $form['field_skills']['#access'] = FALSE;
     $form['field_education']['#access'] = FALSE;
-    $form['field_current_ctc']['#prefix'] = '<div id="resume-ajax-content"></div>';
+    $form['field_current_ctc_int']['#prefix'] = '<div id="resume-ajax-content"></div>';
   }
   if ($form_id == 'node_resume_edit_form') {
     $form['field_first_name']['#prefix'] = '<div id="resume-ajax-content">'; 
@@ -30,7 +32,7 @@ function resume_parser_ai_form_alter(&$form, FormStateInterface $form_state, $fo
     $form['title']['#access'] = FALSE;
 
     $form['field_resume']['#prefix'] = '<div id="resume-hide-job-role">'; 
-    $form['field_location_field']['#suffix'] = '</div>'; 
+    $form['field_address']['#suffix'] = '</div>'; 
     
     if(count($form_state->getValues()) > 0) {
       $form['field_first_name']['#access'] = TRUE;
@@ -105,18 +107,20 @@ function _set_resume_form_value_ajax(&$form, &$form_state) {
 
     exec('python3 ' . $temp . ".py '" . $_SERVER["DOCUMENT_ROOT"] . $string . "' " . $ext, $resume_data, $retval);
 
-    $education = str_replace("{'", '', $resume_data[5]);
-    $education = str_replace("'}", '', $education);
-    $education = str_replace("'", '', $education);
+    if(isset($resume_data[5]) && $resume_data[5] != 'set()') {
+      $education = str_replace("{'", '', $resume_data[5]);
+      $education = str_replace("'}", '', $education);
+      $education = str_replace("'", '', $education);
+      $form['field_education']['widget'][0]['value']['#value'] = $education;
+    }
 
-    $form['field_first_name']['widget'][0]['value']['#value'] = isset($resume_data[0]) ? $resume_data[0] : '';
-    $form['field_last_name']['widget'][0]['value']['#value'] = isset($resume_data[1]) ? $resume_data[1] : '';
+    $form['field_first_name']['widget'][0]['value']['#value'] = (isset($resume_data[0]) && $resume_data[0]) ? '' : $resume_data[0];
+    $form['field_last_name']['widget'][0]['value']['#value'] = (isset($resume_data[1]) && $resume_data[1]) ? '' : $resume_data[1];
     $form['field_phone']['widget'][0]['value']['#value'] = isset($resume_data[2]) ? $resume_data[2] : '';
-    $form['field_email']['widget'][0]['value']['#value'] = $resume_data[3] == 'set()' ? '' : $resume_data[3];
-    $form['field_education']['widget'][0]['value']['#value'] = $education;
+    $form['field_email']['widget'][0]['value']['#value'] = (isset($resume_data[3]) && $resume_data[3]) == 'set()' ? '' : $resume_data[3];
     $form['field_experience']['widget'][0]['value']['#value'] = isset($resume_data[6]) ? $resume_data[6] : '';
 
-    if($resume_data[4] != 'set()') {
+    if(isset($resume_data[4]) && $resume_data[4] != 'set()') {
       $skills = str_replace("{'", '', $resume_data[4]);
       $skills = str_replace("'}", '', $skills);
       $skills = str_replace("'", '', $skills);
@@ -135,11 +139,13 @@ function _set_resume_form_value_ajax(&$form, &$form_state) {
             $arr_term_ids[$term->id()] = $term->getName();
           }
         } else {
-          $term_id = Term::create([
-            'name' => trim($str_skill), 
-            'vid' => 'skills',
-          ])->save();
-          $arr_term_ids[$term_id] = trim($str_skill);
+          if(!empty($str_skill)) {
+            $term_id = Term::create([
+              'name' => trim($str_skill), 
+              'vid' => 'skills',
+            ])->save();
+            $arr_term_ids[$term_id] = trim($str_skill);
+          }
         }
       }
 
@@ -155,6 +161,20 @@ function _set_resume_form_value_ajax(&$form, &$form_state) {
 
 function _custom_resume_parser_ai_submission(&$form, FormStateInterface &$form_state) {
   
-  $form_state->setValue('title', [['value' => $form_state->getValue('field_first_name')[0]['value'] . ' ' . $form_state->getValue('field_last_name')[0]['value']]]);
+  \Drupal::messenger()->deleteAll();
+  \Drupal::messenger()->addStatus(t('Thank you for uploading your resume.'));
+
+  $form_state->setValue('title', [['value' => $form_state->getValue('field_first_name')[0]['value'] . ' 11' . $form_state->getValue('field_last_name')[0]['value']]]);
    
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function resume_parser_ai_entity_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
+
+  if ($entity->bundle() == 'resume') {
+    $build['#attached']['library'][] = 'resume_parser_ai/resume_parser_ai.custom';
+  }
+
 }

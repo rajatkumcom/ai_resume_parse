@@ -1,0 +1,7 @@
+resumeslackupdate.settingsform:
+  path: /admin/resumeslackupdate/settings
+  defaults:
+    _form: Drupal\resumeslackupdate\Form\SettingsForm
+    _title: Resume Slack Update Settings
+  requirements:
+    _role: "administrator + hr"

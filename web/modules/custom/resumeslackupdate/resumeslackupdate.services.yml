@@ -1,0 +1,4 @@
+services:
+  resumeslackupdate.slackresumemessage:
+    class: Drupal\resumeslackupdate\SlackResumeMessageService
+    arguments: ['@config.factory', '@http_client', '@logger.factory', '@messenger']

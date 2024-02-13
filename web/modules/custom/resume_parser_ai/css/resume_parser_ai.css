@@ -1,3 +1,9 @@
-.display-none-ajax-button {
+.display-none-ajax-button,
+.page-title,
+.status-message-list li:nth-child(2) {
   display: none !important;
+}
+
+.node-content {
+  min-height: 400px;
 }

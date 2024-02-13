@@ -1,0 +1,61 @@
+<?php
+
+/**
+ * @file
+ * This is the module to send current resumes to slack during cron run.
+ */
+
+use Drupal\Core\Url;
+use Drupal\node\Entity\Node;
+use Drupal\taxonomy\Entity\Term;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+
+/**
+ * Implements hook_cron().
+ */
+function resumeslackupdate_cron() {
+  $nodeIds = resumeslackupdate_get_node_ids();
+  $message = [];
+
+  foreach ($nodeIds as $nodeId) {
+    $node = Node::load($nodeId);
+    $config = \Drupal::configFactory()->getEditable("resumeslackupdate.module.settings");
+
+    $skillsIds = $node->get("field_skills")->getValue();
+    $skills = array_map(fn($v) => Term::load($v['target_id'])->getName(), $skillsIds);
+
+    $message[] = [
+      "name" => $node->get('field_first_name')->getString() . " " . $node->get('field_last_name')->getString(),
+      "exp" => $node->get('field_experience')->getString(),
+      "skills" => implode(", ", $skills),
+      "phone" => $node->get('field_phone')->getString(),
+      "email" => $node->get('field_email')->getString(),
+      "cur_ctc" => $node->get('field_current_ctc_int')->getString(),
+      "ex_ctc" => $node->get('field_expected_ctc_int')->getString(),
+      "url" => Url::fromRoute('entity.node.canonical', ['node' => $node->id()])->setAbsolute()->toString(),
+    ];
+  }
+  \Drupal::logger("resume_to_slack")->debug(count($message));
+  $response = \Drupal::service('resumeslackupdate.slackresumemessage')->sendMessage(serialize($message), '', '');
+  if ($response && RedirectResponse::HTTP_OK == $response->getStatusCode()) {
+    $config->set("last_successful_slack_response", time())->save();
+  }
+}
+
+/**
+ * Function to fetch the current candidate node ids.
+ */
+function resumeslackupdate_get_node_ids() {
+  $config = \Drupal::config("resumeslackupdate.module.settings");
+  $selectedSkillsConfig = $config->get("selected_skills") ?? [];
+  $lastTime = $config->get("last_successful_slack_response") ?? 0;
+
+  $selectedSkills = array_filter($selectedSkillsConfig, fn($v) => $v === 1);
+  $selectedSkillsIds = array_map(fn($v) => str_replace("select_", "", $v), array_keys($selectedSkills));
+
+  return \Drupal::entityQuery('node')->accessCheck(FALSE)
+    ->condition('type', 'resume')
+    ->condition('field_skills', $selectedSkillsIds, "IN")
+    ->condition('changed', $lastTime, ">")
+    ->execute();
+}

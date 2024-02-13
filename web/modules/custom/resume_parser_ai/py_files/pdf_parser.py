@@ -28,7 +28,8 @@ SKILLS_DB = [
   'javascript',
   'jquery',
   'react',
-  'angular'
+  'angular',
+  'jira',
 ]
 
 RESERVED_WORDS = [
